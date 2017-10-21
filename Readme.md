@@ -1,7 +1,9 @@
 # Liquid Investigations: OpenVPN Configuration PoC
 
 This repository houses some python scripts to configure OpenVPN. This is to be
-integrated with the setup repository, but serves for now as a PoC.
+integrated with the setup repository, but serves for now as a PoC. It is
+inspired by [this](https://www.digitalocean.com/community/tutorials/how-to-set-up-an-openvpn-server-on-ubuntu-16-04)
+tutorial.
 
 To play with this setup, run `vagrant up` in the `Vagrant/` folder.
 
