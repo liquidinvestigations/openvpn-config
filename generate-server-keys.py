@@ -86,7 +86,7 @@ if __name__ == '__main__':
     subprocess.call(['./pkitool', '--server', 'server'])
 
     print('running openssl to generate strong Diffie-Hellman keys')
-    subprocess.call(['openssl', 'dhparam', '-out', 'dh_file', key_size])
+    subprocess.call(['openssl', 'dhparam', '-out', dh_file, key_size])
 
     print('generating OpenVPN HMAC signature')
     subprocess.call(['openvpn', '--genkey', '--secret', hmac_file])
