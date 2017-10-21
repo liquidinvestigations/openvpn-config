@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 
+# Default settings for CA template
 default_ca_vars = {
     'key_country': '"US"',
     'key_province': '"MI"',
@@ -19,13 +20,17 @@ default_ca_vars = {
     'key_name': '"detroit-liquid.local"'
 }
 
+# set up some paths
 ca_template_dir = os.path.join(os.getcwd(),'templates')
 ca_template_file = 'vars.template'
 ca_output_dir = os.path.join(os.getcwd(),'openvpn-ca')
 ca_output_file = 'vars'
 
 def create_ca_vars(input_template_file, output_file, vars_dict):
-    # open the template file,
+    '''
+    Creates an easy-rsa vars file from the supplied template and
+    dictionary. Output file is specified as output_file.
+    '''
     with open(input_template_file) as vars_template, \
             open(output_file, 'w') as vars_output:
 
@@ -47,6 +52,8 @@ if __name__ == '__main__':
     create_ca_vars(template_file, output_file, default_ca_vars)
 
     # 'source' the vars file.
+    # this creates a bash subprocess, sources the file, outputs the new
+    # environment, then writes it to os.environ, key by key.
     # TODO: proper error handling here on Popen() and communicate()
     print("setting OS environment from vars file")
     os.chdir(ca_output_dir)
@@ -61,8 +68,7 @@ if __name__ == '__main__':
 
     proc.communicate()
 
-
-    # cleanup, keygen
+    # clean the keys directory, generate certificates and keys
     os.chdir(ca_output_dir)
     key_dir = os.environ['KEY_DIR']
     key_size = os.environ['KEY_SIZE']
