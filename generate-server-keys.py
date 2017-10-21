@@ -22,7 +22,7 @@ default_ca_vars = {
 
 # set up some paths
 ca_template_dir = os.path.join(os.getcwd(),'templates')
-ca_template_file = 'vars.template'
+ca_template_file = 'vars.j2'
 ca_output_dir = os.path.join(os.getcwd(),'openvpn-ca')
 ca_output_file = 'vars'
 
