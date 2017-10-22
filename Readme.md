@@ -32,7 +32,7 @@ Requires root to run.
 
  - Creates a CA in /etc/openvpn/openvpn-ca
  - Creates a CA config (vars) from template
- - Installs certs and key database in /etc/openvpn/openvpn-ca/keys.
+ - Creates certs and key database in /etc/openvpn/openvpn-ca/keys.
  - Creates a server.conf from template, installs in /etc/openvpn
  - Installs certificates and keys in /etc/openvpn
  - Configures the network:
