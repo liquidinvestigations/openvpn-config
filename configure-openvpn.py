@@ -66,3 +66,6 @@ if __name__ == '__main__':
 
     print('copying CA to /etc/openvpn')
     shutil.copytree(ca_dir, dest_ca_dir)
+
+    print('starting openvpn')
+    subprocess.call(['systemctl', 'start', 'openvpn@server'])
