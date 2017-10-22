@@ -26,7 +26,7 @@ It then creates a virtualenv, and installs Python dependencies from
 
 ### Scripts
 
-`./create-client-ovpn.py`:
+`./openvpn-setup.py`:
 
 Requires root to run.
 
