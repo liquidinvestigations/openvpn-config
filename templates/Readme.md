@@ -2,12 +2,12 @@
 
 `vars.j2`:
 
-Jinja2 template for easy-rsa. Used by `../generate-server-keys.py`. Substitutions
-should be self-explanatory.
+Jinja2 template for easy-rsa. Used by `../generate-server-keys.py`. 
 
 `openvpn.conf.j2`:
 
 Template for `/etc/openvpn.conf`. Used by `../configure-openvpn.py`.
 
-TODO: more experimentation needs to be done to ensure that this configuration
-template supports discovery (zeroconf).
+`client.conf.j2`:
+
+Template for client `.ovpn` files. Used by `../create-client-ovpn.py`
