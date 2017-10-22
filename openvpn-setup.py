@@ -3,8 +3,10 @@
 '''
 Inspired by: https://www.digitalocean.com/community/tutorials/how-to-set-up-an-openvpn-server-on-ubuntu-16-04
 
- - Creates a CA, certs, and key database in /etc/openvpn/openvpn-ca.
- - Creates a server.conf, installs in /etc/openvpn
+ - Creates a CA in /etc/openvpn/openvpn-ca
+ - Creates a CA config (vars) from template
+ - Installs certs and key database in /etc/openvpn/openvpn-ca/keys.
+ - Creates a server.conf from template, installs in /etc/openvpn
  - Installs certificates and keys in /etc/openvpn
  - Configures the network:
     - sets up port forwarding via `echo 1 > /proc/sys/net/ipv4/ip_forward`
