@@ -21,6 +21,7 @@ note: this expects that conf_output_dir doesn't exist.
 from jinja2 import Template
 import os
 import shutil
+import subprocess
 
 default_config_dict = {
     'port': '1192',
