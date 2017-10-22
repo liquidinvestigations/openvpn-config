@@ -15,13 +15,16 @@ import subprocess
 
 if __name__ == '__main__':
 
+    print('turning on ip forwarding')
     # echo 1 > /proc/sys/net/ipv4/ip_forward
     with open("/proc/sys/net/ipv4/ip_forward", 'w') as ipfwd:
         ipfwd.write("1")
 
+    print('enabling masquerading')
     # Enable masquerading
     subprocess.call(['iptables', '-t', 'nat', '-A', 'POSTROUTING', '!', '-d',
                          '10.8.0.0/8', '-j', 'MASQUERADE'])
 
+    print('enabling forwarding')
     # Enable forwarding
-    subprocess.call(['iptables', '-A', 'FOWRARD', '-j', 'ACCEPT'])
+    subprocess.call(['iptables', '-A', 'FORWARD', '-j', 'ACCEPT'])
