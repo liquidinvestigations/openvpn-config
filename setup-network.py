@@ -8,7 +8,8 @@ This will do the following:
  - set up port forwarding via `echo 1 > /proc/sys/net/ipv4/ip_forward`
  - sets up masquerading via `iptables -t nat -A POSTROUTING ! -d 10.8.0.0/8 -j MASQUERADE`
  - sets up a forwarding rule via `iptables -A FORWARD -j ACCEPT`
- - start the openvpn server (?)
+
+NOTE: `./Vagrant/Vagrantfile` sets up port forwarding for port 1194(Guest)<->1194(Host)
 '''
 
 import subprocess
