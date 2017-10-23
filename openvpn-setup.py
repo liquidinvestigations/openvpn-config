@@ -36,7 +36,7 @@ default_ca_vars = {
 
 default_server_conf = {
     'port': '1192',
-    'protocol': 'udp'
+    'protocol': 'tcp'
 }
 
 # set up some paths

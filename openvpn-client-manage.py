@@ -21,12 +21,32 @@ This script should be run with root priveleges, as it needs access to the CA in
 `/etc/openvpn/openvpn-ca`
 
 '''
-
+from jinja2 import Template
 import os
 import subprocess
 import argparse
 
+client_conf = {
+    'public_server_address': '10.23.0.23',
+    'public_server_port': '1192',
+    'protocol': 'tcp'
+}
+
 ca_directory = '/etc/openvpn/openvpn-ca'
+ca_keys_directory = '/etc/openvpn/openvpn-ca/keys'
+working_dir = os.getcwd()
+ovpn_template = os.path.join(working_dir, 'templates/client.conf.j2')
+
+
+def file_from_template(template_file, output_file, vars_dict):
+    '''
+    Creates a file from the specified Jinja2 template
+    '''
+    with open(template_file) as template_file, \
+            open(output_file, 'w') as output_file:
+
+        template = Template(template_file.read())
+        output_file.write(template.render(vars_dict))
 
 def source_CA_vars():
     '''
@@ -48,7 +68,7 @@ def source_CA_vars():
 
     proc.communicate()
 
-def create_client_keys(client, ovpn_output_file):
+def create_client_keys(client):
     '''
     Creates client keys for the specified `client`. Creates the specified .ovpn
     config file.
@@ -61,10 +81,27 @@ def create_client_keys(client, ovpn_output_file):
 
     # run pkitool, create keys
     print('running pkitool in ' + ca_directory + ' to create client keys')
-    # subprocess.call(['./pkitool', client])
-    # create .ovpn client file from template
+    subprocess.call(['./pkitool', client])
 
-    pass
+    ca_cert = os.path.join(ca_keys_directory, 'ca.crt')
+    client_cert = os.path.join(ca_keys_directory, client + '.crt')
+    client_key = os.path.join(ca_keys_directory, client + '.key')
+    ta_key = os.path.join(ca_keys_directory, 'ta.key')
+    ovpn_output = os.path.join(working_dir, client + '.ovpn')
+
+    # create .ovpn client file from template
+    with open(ca_cert) as ca_cert_file, \
+            open(client_cert) as client_cert_file, \
+            open(client_key) as client_key_file, \
+            open(ta_key) as ta_key_file:
+
+        client_conf['ca_cert'] = ca_cert_file.read()
+        client_conf['client_cert'] = client_cert_file.read()
+        client_conf['client_key'] = client_key_file.read()
+        client_conf['ta_key'] = ta_key_file.read()
+
+        file_from_template(ovpn_template, ovpn_output, client_conf)
+
 
 def revoke_client_keys(client):
     '''
