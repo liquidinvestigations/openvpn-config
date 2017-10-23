@@ -112,8 +112,14 @@ if __name__ == '__main__':
     print('running pkitool to initialize server certs')
     subprocess.call(['./pkitool', '--server', 'server'])
 
+
     print('running openssl to generate strong Diffie-Hellman keys')
-    subprocess.call(['openssl', 'dhparam', '-out', dh_file, key_size])
+    # NOTE: i've added the '-dsaparam' option here. research says that it's
+    #       practically just as strong, but generates *much* faster.
+    #       see : https://security.stackexchange.com/a/95184
+    #       i can't find another reference to this, so if anyone wants to
+    #       do the research to tell me why this is terrible, i'd love to hear it
+    subprocess.call(['openssl', 'dhparam', '-dsaparam', '-out', dh_file, key_size])
 
     print('generating OpenVPN HMAC signature')
     subprocess.call(['openvpn', '--genkey', '--secret', hmac_file])
