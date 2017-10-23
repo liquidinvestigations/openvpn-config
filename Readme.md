@@ -42,6 +42,17 @@ Requires root to run.
  - Starts OpenVPN
 
 
-TODO : `./ovpn-client.py`:
+`./ovpn-client-manage.py`:
 
 This script manages keys and .ovpn files for OpenVPN users.
+
+It can:
+
+ - generate and register client keys
+ - generate a client .ovpn file for installation
+
+OR
+
+ - revoke client keys
+ - reload the revoked certificates list in openvpn-ca
+ 
