@@ -112,7 +112,6 @@ if __name__ == '__main__':
     print('running pkitool to initialize server certs')
     subprocess.call(['./pkitool', '--server', 'server'])
 
-
     print('running openssl to generate strong Diffie-Hellman keys')
     # NOTE: i've added the '-dsaparam' option here. research says that it's
     #       practically just as strong, but generates *much* faster.
