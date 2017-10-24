@@ -99,7 +99,7 @@ if __name__ == '__main__':
     '''
     # Set up CA directory
     print("setting up certificate authority directory")
-    subprocess.call(['make-cadir', ca_output_dir])
+    run(['make-cadir', ca_output_dir])
 
     # Create 'vars' file from template
     print("creating vars file from template")
@@ -109,20 +109,19 @@ if __name__ == '__main__':
     ca_vars = get_ca_vars()
 
     # clean the keys directory, generate certificates and keys
-    os.chdir(ca_output_dir)
     key_dir = ca_vars['KEY_DIR']
     key_size = ca_vars['KEY_SIZE']
     dh_file = os.path.join(key_dir, 'dh' + key_size + '.pem')
     hmac_file = os.path.join(key_dir, 'ta.key')
 
     print('cleaning up before key generation (running ./clean-all)')
-    run(['./clean-all'], env=ca_vars)
+    run(['./clean-all'], env=ca_vars, cwd=ca_output_dir)
 
     print('running pkitool to initialize ca')
-    run(['./pkitool', '--initca'], env=ca_vars)
+    run(['./pkitool', '--initca'], env=ca_vars, cwd=ca_output_dir)
 
     print('running pkitool to initialize server certs')
-    run(['./pkitool', '--server', 'server'], env=ca_vars)
+    run(['./pkitool', '--server', 'server'], env=ca_vars, cwd=ca_output_dir)
 
     print('running openssl to generate strong Diffie-Hellman keys')
     # NOTE: i've added the '-dsaparam' option here. research says that it's
@@ -130,10 +129,10 @@ if __name__ == '__main__':
     #       see : https://security.stackexchange.com/a/95184
     #       i can't find another reference to this, so if anyone wants to
     #       do the research to tell me why this is terrible, i'd love to hear it
-    run(['openssl', 'dhparam', '-dsaparam', '-out', dh_file, key_size], env=ca_vars)
+    run(['openssl', 'dhparam', '-dsaparam', '-out', dh_file, key_size], env=ca_vars, cwd=ca_output_dir)
 
     print('generating OpenVPN HMAC signature')
-    run(['openvpn', '--genkey', '--secret', hmac_file], env=ca_vars)
+    run(['openvpn', '--genkey', '--secret', hmac_file], env=ca_vars, cwd=ca_output_dir)
 
     print('generating server.conf')
     file_from_template(conf_template_file, conf_output_file, default_server_conf)
@@ -143,15 +142,13 @@ if __name__ == '__main__':
         shutil.copy2(keyfile, conf_output_dir)
 
     print('initializing revocation list')
-    run(['./pkitool', 'CRL_INIT'], env=ca_vars)
+    run(['./pkitool', 'CRL_INIT'], env=ca_vars, cwd=ca_output_dir)
 
     # we expect this to return a non-zero exit status of 2
     try:
-        run(['./revoke-full', 'CRL_INIT'], env=ca_vars)
+        run(['./revoke-full', 'CRL_INIT'], env=ca_vars, cwd=ca_output_dir)
     except subprocess.CalledProcessError as err:
-        if (err.returncode == 2):
-            pass
-        else:
+        if (err.returncode != 2):
             raise err
 
     revocation_list = os.path.join(ca_keys_dir, 'crl.pem')
@@ -162,11 +159,11 @@ if __name__ == '__main__':
         ipfwd.write("1")
 
     print('enabling masquerading')
-    subprocess.call(['iptables', '-t', 'nat', '-A', 'POSTROUTING', '!', '-d',
+    run(['iptables', '-t', 'nat', '-A', 'POSTROUTING', '!', '-d',
                          '10.8.0.0/8', '-j', 'MASQUERADE'])
 
     print('enabling forwarding')
-    subprocess.call(['iptables', '-A', 'FORWARD', '-j', 'ACCEPT'])
+    run(['iptables', '-A', 'FORWARD', '-j', 'ACCEPT'])
 
     print('starting openvpn')
-    subprocess.call(['systemctl', 'start', 'openvpn@server'])
+    run(['systemctl', 'start', 'openvpn@server'])
