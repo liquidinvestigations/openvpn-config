@@ -58,6 +58,11 @@ keyfiles = list(map(lambda x: os.path.join(ca_keys_dir, x),
 conf_output_dir = '/etc/openvpn'
 conf_output_file = os.path.join(conf_output_dir, 'server.conf')
 
+def run(args, **kwargs):
+    args = [str(a) for a in args]
+    print('+', ' '.join(args))
+    return subprocess.run(args, check=True, **kwargs)
+
 def file_from_template(template_file, output_file, vars_dict):
     '''
     Creates a file from the specified Jinja2 template
@@ -67,6 +72,27 @@ def file_from_template(template_file, output_file, vars_dict):
 
         template = Template(template_file.read())
         output_file.write(template.render(vars_dict))
+
+def get_ca_vars():
+    '''
+    'source' the vars file.
+    this creates a bash subprocess, sources the file, outputs the new
+    environment, then writes it to os.environ, key by key.
+    TODO: proper error handling here on Popen() and communicate()
+    '''
+    print("getting CA environment vars from file")
+    vars_dict = {}
+    os.chdir(ca_output_dir)
+    command = ['bash', '-c', 'source ' + vars_output_file + ' && env']
+
+    proc = subprocess.Popen(command, stdout = subprocess.PIPE)
+    for line in proc.stdout:
+        (key, _, value) = line.decode('ascii').rstrip().partition("=")
+        vars_dict[key] = value
+    proc.communicate()
+
+    return vars_dict
+
 
 if __name__ == '__main__':
     ''' note: this expects that ca_output_dir doesn't exist
@@ -79,38 +105,24 @@ if __name__ == '__main__':
     print("creating vars file from template")
     file_from_template(vars_template_file, vars_output_file, default_ca_vars)
 
-    # 'source' the vars file.
-    # this creates a bash subprocess, sources the file, outputs the new
-    # environment, then writes it to os.environ, key by key.
-    # TODO: proper error handling here on Popen() and communicate()
-    print("setting OS environment from vars file")
-    os.chdir(ca_output_dir)
-    command = ['bash', '-c', 'source ' + vars_output_file + ' && env']
-
-    proc = subprocess.Popen(command, stdout = subprocess.PIPE)
-
-    for line in proc.stdout:
-        # TODO: are we OK to just 'decode('ascii').rstrip() here?'
-        (key, _, value) = line.decode('ascii').rstrip().partition("=")
-        os.environ[key] = value
-
-    proc.communicate()
+    # Get CA environment variables
+    ca_vars = get_ca_vars()
 
     # clean the keys directory, generate certificates and keys
     os.chdir(ca_output_dir)
-    key_dir = os.environ['KEY_DIR']
-    key_size = os.environ['KEY_SIZE']
+    key_dir = ca_vars['KEY_DIR']
+    key_size = ca_vars['KEY_SIZE']
     dh_file = os.path.join(key_dir, 'dh' + key_size + '.pem')
     hmac_file = os.path.join(key_dir, 'ta.key')
 
     print('cleaning up before key generation (running ./clean-all)')
-    subprocess.call(['./clean-all'])
+    run(['./clean-all'], env=ca_vars)
 
     print('running pkitool to initialize ca')
-    subprocess.call(['./pkitool', '--initca'])
+    run(['./pkitool', '--initca'], env=ca_vars)
 
     print('running pkitool to initialize server certs')
-    subprocess.call(['./pkitool', '--server', 'server'])
+    run(['./pkitool', '--server', 'server'], env=ca_vars)
 
     print('running openssl to generate strong Diffie-Hellman keys')
     # NOTE: i've added the '-dsaparam' option here. research says that it's
@@ -118,10 +130,10 @@ if __name__ == '__main__':
     #       see : https://security.stackexchange.com/a/95184
     #       i can't find another reference to this, so if anyone wants to
     #       do the research to tell me why this is terrible, i'd love to hear it
-    subprocess.call(['openssl', 'dhparam', '-dsaparam', '-out', dh_file, key_size])
+    run(['openssl', 'dhparam', '-dsaparam', '-out', dh_file, key_size], env=ca_vars)
 
     print('generating OpenVPN HMAC signature')
-    subprocess.call(['openvpn', '--genkey', '--secret', hmac_file])
+    run(['openvpn', '--genkey', '--secret', hmac_file], env=ca_vars)
 
     print('generating server.conf')
     file_from_template(conf_template_file, conf_output_file, default_server_conf)
@@ -131,8 +143,17 @@ if __name__ == '__main__':
         shutil.copy2(keyfile, conf_output_dir)
 
     print('initializing revocation list')
-    subprocess.call(['./pkitool', 'CRL_INIT'])
-    subprocess.call(['./revoke-full', 'CRL_INIT'])
+    run(['./pkitool', 'CRL_INIT'], env=ca_vars)
+
+    # we expect this to return a non-zero exit status of 2
+    try:
+        run(['./revoke-full', 'CRL_INIT'], env=ca_vars)
+    except subprocess.CalledProcessError as err:
+        if (err.returncode == 2):
+            pass
+        else:
+            raise err
+
     revocation_list = os.path.join(ca_keys_dir, 'crl.pem')
     shutil.copy2(revocation_list, conf_output_dir)
 
