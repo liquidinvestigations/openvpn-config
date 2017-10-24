@@ -130,6 +130,12 @@ if __name__ == '__main__':
     for keyfile in keyfiles:
         shutil.copy2(keyfile, conf_output_dir)
 
+    print('initializing revocation list')
+    subprocess.call(['./pkitool', 'CRL_INIT'])
+    subprocess.call(['./revoke-full', 'CRL_INIT'])
+    revocation_list = os.path.join(ca_keys_dir, 'crl.pem')
+    shutil.copy2(revocation_list, conf_output_dir)
+
     print('turning on ip forwarding')
     with open("/proc/sys/net/ipv4/ip_forward", 'w') as ipfwd:
         ipfwd.write("1")

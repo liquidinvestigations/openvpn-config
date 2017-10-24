@@ -22,6 +22,7 @@ This script should be run with root priveleges, as it needs access to the CA in
 
 '''
 from jinja2 import Template
+import shutil
 import os
 import subprocess
 import argparse
@@ -34,6 +35,7 @@ client_conf = {
 
 ca_directory = '/etc/openvpn/openvpn-ca'
 ca_keys_directory = '/etc/openvpn/openvpn-ca/keys'
+openvpn_conf_directory = '/etc/openvpn'
 working_dir = os.getcwd()
 ovpn_template = os.path.join(working_dir, 'templates/client.conf.j2')
 
@@ -42,6 +44,7 @@ def file_from_template(template_file, output_file, vars_dict):
     '''
     Creates a file from the specified Jinja2 template
     '''
+
     with open(template_file) as template_file, \
             open(output_file, 'w') as output_file:
 
@@ -55,6 +58,7 @@ def source_CA_vars():
     environment, then writes it to os.environ, key by key.
     TODO: proper error handling here on Popen() and communicate()
     '''
+
     print("setting OS environment from vars file")
     os.chdir(ca_directory)
     command = ['bash', '-c', 'source ' + 'vars' + ' && env']
@@ -62,11 +66,11 @@ def source_CA_vars():
     proc = subprocess.Popen(command, stdout = subprocess.PIPE)
 
     for line in proc.stdout:
-        # TODO: are we OK to just 'decode('ascii').rstrip() here?'
         (key, _, value) = line.decode('ascii').rstrip().partition("=")
         os.environ[key] = value
 
     proc.communicate()
+
 
 def create_client_keys(client):
     '''
@@ -116,16 +120,23 @@ def revoke_client_keys(client):
     os.chdir(ca_directory)
 
     # revoke keys
-    print('running revoke-all in ' + ca_directory + ' to revoke client keys')
-    # copy revoked key database
-    # reload openvpn settings to pick up the changes
+    print('running revoke-full in ' + ca_directory + ' to revoke client keys')
+    subprocess.call(['./revoke-full', client])
 
-    pass
+    # copy crl file
+    print('copying crl file')
+    crl_file = os.path.join(ca_keys_directory, 'crl.pem')
+    shutil.copy(crl_file, openvpn_conf_directory)
+
+    # reload openvpn settings to pick up the changes
+    print('restarting openvpn')
+    subprocess.call(['systemctl', 'restart', 'openvpn@server'])
+
 
 if __name__ == '__main__':
     # parse arguments
     argument_parser = argparse.ArgumentParser(description =
-            'Create or revoke client keys, generating an .ovpn file as needed.')
+            'Create or revoke client keys, generating an .ovpn file if needed.')
 
     group = argument_parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-c', '--create', action='store_true', help='Create client keys.')
