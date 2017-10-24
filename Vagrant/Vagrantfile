@@ -1,0 +1,97 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+
+  # Fix passthrough of bad locale
+  ENV['LC_ALL']="en_US.UTF-8"
+  ENV['LANG']="en_US.UTF-8"
+  ENV['LANGUAGE']="en_US.UTF-8"
+
+  # tell apt-get not to expect a tty
+  ENV['DEBIAN_FRONTEND']="noninteractive"
+
+  # provider-specific configurations
+  def configure_vbox_provider(config)
+    config.vm.provider :virtualbox do |vbox, override|
+
+      override.vm.box = "bento/ubuntu-16.10"
+
+      vbox.memory = 384
+      vbox.cpus = 1
+
+      override.ssh.forward_agent = true
+      override.ssh.forward_x11 = true
+
+      # port forwarding for VPN
+      config.vm.network "private_network", ip: "10.23.0.23"
+      override.vm.network "forwarded_port", guest: 1194, host: 1194, protocol: "udp"
+
+      # this maps the current folder to a hidden folder in the vagrant user's
+      # home directory
+      override.vm.synced_folder ".", "/home/vagrant/.VagrantSetup"
+      override.vm.synced_folder "..", "/home/vagrant/ovpn-config"
+
+      # add time sync stuff
+      vbox.customize [ "guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 500 ]
+
+    end
+  end
+
+  # proider-specific configuration
+  configure_vbox_provider(config)
+
+  # provisioning (currently provider-agnostic)
+  config.vm.provision "shell", privileged: false, name: "Install dependencies", inline: <<-SHELL
+    # set up locale
+    export LC_ALL="en_US.UTF-8"
+    export LANG="en_US.UTF-8"
+    export LANGUAGE="en_US.UTF-8"
+    sudo locale-gen en_US.UTF-8
+
+    # set up variables
+    export test_home=$HOME/ovpn-config
+
+    # install system dependencies
+    sudo apt-get update
+
+    # PREREQUISITES
+    echo "Installing git, pip3..."
+    sudo apt-get install -y python3-pip
+
+    # PREREQUISITES
+    echo "Installing openvpn, easy-rsa..."
+    sudo apt-get install -y openvpn easy-rsa
+
+    # PREREQUISITES
+    # install virtualenv
+    sudo -H pip3 install --upgrade pip
+    sudo -H pip3 install virtualenv
+
+    # Create python3 virtualenv in dev root
+    virtualenv --python=/usr/bin/python3 --no-site-packages $test_home/Virtualenv
+
+    # Activate the virtualenv
+    . $test_home/Virtualenv/bin/activate
+
+    # Install required packages via pip
+    pip install -r $test_home/requirements.txt
+
+    deactivate
+
+    # Define some environment variables and other configuration to .profile for vagrant ssh login
+    echo "" >> ~/.profile
+    echo "# Configuration inserted by Vagrant shell provisioner:" >> ~/.profile
+    echo "" >> ~/.profile
+    echo "export test_home=$test_home" >> ~/.profile
+
+    echo "export LC_ALL=\"en_US.UTF-8\"" >> ~/.profile
+    echo "export LANG=\"en_US.UTF-8\"" >> ~/.profile
+    echo "export LANGUAGE=\"en_US.UTF-8\"" >> ~/.profile
+    echo "sudo locale-gen en_US.UTF-8" >> ~/.profile
+
+    echo "source $test_home/Virtualenv/bin/activate" >> ~/.profile
+    echo "cd \$test_home" >> ~/.profile
+
+  SHELL
+end
