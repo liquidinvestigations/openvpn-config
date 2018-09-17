@@ -22,6 +22,7 @@ This script should be run with root priveleges, as it needs access to the CA in
 
 '''
 from jinja2 import Template
+import shutil
 import os
 import subprocess
 import argparse
@@ -34,14 +35,20 @@ client_conf = {
 
 ca_directory = '/etc/openvpn/openvpn-ca'
 ca_keys_directory = '/etc/openvpn/openvpn-ca/keys'
+openvpn_conf_directory = '/etc/openvpn'
 working_dir = os.getcwd()
 ovpn_template = os.path.join(working_dir, 'templates/client.conf.j2')
 
+def run(args, **kwargs):
+    args = [str(a) for a in args]
+    print('+', ' '.join(args))
+    return subprocess.run(args, check=True, **kwargs)
 
 def file_from_template(template_file, output_file, vars_dict):
     '''
     Creates a file from the specified Jinja2 template
     '''
+
     with open(template_file) as template_file, \
             open(output_file, 'w') as output_file:
 
@@ -52,21 +59,22 @@ def source_CA_vars():
     '''
     'source' the CA vars file.
     this creates a bash subprocess, sources the file, outputs the new
-    environment, then writes it to os.environ, key by key.
+    environment, then writes it to a dictionary and returns it.
     TODO: proper error handling here on Popen() and communicate()
     '''
+    vars_dict = {}
     print("setting OS environment from vars file")
     os.chdir(ca_directory)
+
     command = ['bash', '-c', 'source ' + 'vars' + ' && env']
-
     proc = subprocess.Popen(command, stdout = subprocess.PIPE)
-
     for line in proc.stdout:
-        # TODO: are we OK to just 'decode('ascii').rstrip() here?'
         (key, _, value) = line.decode('ascii').rstrip().partition("=")
-        os.environ[key] = value
-
+        vars_dict[key] = value
     proc.communicate()
+
+    return vars_dict
+
 
 def create_client_keys(client):
     '''
@@ -75,13 +83,11 @@ def create_client_keys(client):
     '''
 
     # source vars for interacting with CA
-    source_CA_vars()
-    # enter the CA directory
-    os.chdir(ca_directory)
+    ca_env = source_CA_vars()
 
     # run pkitool, create keys
     print('running pkitool in ' + ca_directory + ' to create client keys')
-    subprocess.call(['./pkitool', client])
+    run(['./pkitool', client], env=ca_env, cwd=ca_directory)
 
     ca_cert = os.path.join(ca_keys_directory, 'ca.crt')
     client_cert = os.path.join(ca_keys_directory, client + '.crt')
@@ -111,25 +117,36 @@ def revoke_client_keys(client):
     '''
 
     # source vars for interacting with CA
-    source_CA_vars()
-    # enter the CA directory
-    os.chdir(ca_directory)
+    ca_env = source_CA_vars()
 
     # revoke keys
-    print('running revoke-all in ' + ca_directory + ' to revoke client keys')
-    # copy revoked key database
-    # reload openvpn settings to pick up the changes
+    print('running revoke-full in ' + ca_directory + ' to revoke client keys')
+    try:
+        run(['./revoke-full', client], env=ca_env, cwd=ca_directory)
+    except subprocess.CalledProcessError as err:
+        if (err.returncode != 2):
+            raise err
 
-    pass
+    # copy crl file
+    print('copying crl file')
+    crl_file = os.path.join(ca_keys_directory, 'crl.pem')
+    shutil.copy(crl_file, openvpn_conf_directory)
+
+    # reload openvpn settings to pick up the changes
+    print('restarting openvpn')
+    run(['systemctl', 'restart', 'openvpn@server'])
+
 
 if __name__ == '__main__':
     # parse arguments
     argument_parser = argparse.ArgumentParser(description =
-            'Create or revoke client keys, generating an .ovpn file as needed.')
+            'Create or revoke client keys, generating an .ovpn file if needed.')
 
     group = argument_parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('-c', '--create', action='store_true', help='Create client keys.')
-    group.add_argument('-r', '--revoke', action='store_true', help='Revoke client keys.')
+    group.add_argument('-c', '--create', action='store_true',
+                        help='Create client keys.')
+    group.add_argument('-r', '--revoke', action='store_true',
+                        help='Revoke client keys.')
 
     argument_parser.add_argument('client', help='The name for the client.')
     args = argument_parser.parse_args()
